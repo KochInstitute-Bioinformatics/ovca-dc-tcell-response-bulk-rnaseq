@@ -60,6 +60,7 @@ FASTQSCREEN/
 
 # Large project-specific files (regenerate or obtain separately)
 mm10_ens113_*.xlsx
+!annotationFiles/mm10_ens113_*.xlsx
 *_assembled.xlsx
 
 # R
