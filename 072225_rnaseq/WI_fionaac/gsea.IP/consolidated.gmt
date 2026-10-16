@@ -1,0 +1,12 @@
+Naive	consolidated	Ccr7	Dapl1	Lef1	Eef1b2	Sell	Vps37b	Satb1	Rgcc	Igfbp4	Rgs10	Rack1	Tpt1	Tcf7	Dusp10	Fam241a	Tsc22d3	Foxp1	Npm1	Emb	Eef1a1	Rps20	Rpl36a	Rps19	Nsg2	Actn1	Gm26917	Rpl35	Rpl12	Rplp1	Rps8	Rps24	Ighm
+Effector	consolidated	Ctla2a	S100a4	S100a6	S100a10	Ly6c2	Lgals1	Ccr2	Lsp1	Vim	Crip1	Itgax	Tagln2	Lgals3	Actg1	Dnajc15	Epsti1	Gzmb	S100a11	Cxcr3	Cd52	Klrg1	Pycard	Anxa1	Jak1	S1pr4	Abracl	Cd47	Itgb7	Gna15	Wdr95	Snx5
+Mem.Pre	consolidated	Tnfsf8	Slamf6	Cd9	Tcf7	Crtam	Tnfrsf25	Cxcr3	Gpr183	Itgb1	Ctla2a	Gzmb	Ltb	Emb	Traf1	Ighm	Asap1	Adk	Igkc	Nsg2	Id3
+Memory	consolidated	Hspa1a	Hspa1b	Dnajb1	Jun	Zfp36	Atf3	Nr4a1	Hsph1	Btg2	Klf2	Hsp90aa1	Klf6	Trav14-1	Trbv13-3	Ier5	Ubc	Ier2	Kdm6b	Junb	Hsp90ab1	Il7r	Sidt1	Gpr183	Gzmm	Emb	Gramd3	Rpl29	Atp1a1	Ier3	Rnf138	Cxcr3	Gpr132	Rpl38	Lcn4	Fam46a	Rpl13a	Gm35037	Wfikkn2	Tmem154	Reck
+ISG	consolidated	Ifit3	Ifit1	Mx1	Rsad2	Ifit3b	Cmpk2	Isg15	Usp18	Ifi204	Oasl1	Isg20	Rtp4	Dhx58	Zbp1	Ifih1	Phf11b	Trafd1	Xaf1	Phf11a	Ifit1bl1	Bst2	Irf7	Samhd1	Stat1	Ifi209	Trim30a	Ly6a	Igtp
+Pre.Exh	consolidated	Ifi27l2a	Slamf6	Xcl1	Cxcl10	2310001H17Rik	Tnfsf8	Nrgn	Ifit3	Tcf7	Gdi2	Adk	Limd2	Ms4a4c	Cd9	Gapdh	Gstp3	Asap1	Inpp4b	Crtam	Ikzf2
+Exh.Prog	consolidated	Cxcl10	Xcl1	Tnfsf8	Slamf6	Ms4a4c	Spock2	Tnfsf4	Cd9	1700019D03Rik	Ifi27l2a	Kcnip3	Art3	Ccr6	Tox	Ctla4	Nr4a2	Tbc1d4	Tnfrsf4	Klf4	Tspan3	Id3	Ctla2a	Rpl10	Rpl41	mt-Atp6	Gm11808	Rpl9	Crtam	Ltb	mt-Nd3	Icos	Traf1	Inpp4b	Zfp36l1	Ddit4
+Exh.Int	consolidated	Ccl5	Rgs16	S100a4	Nkg7	Ccl3	Lgals3	Tox	Prex1	Emp3	Ifi27l2a	H2-Q7	Prr5l	Hsp90ab1	Rack1	Satb1	Tcf7	S100a6	Emb	Gm42418	Enho	Hist1h2ap	Ube2c	Lgals1	Anxa2	Gm42031	Crip1	Mki67	Pglyrp1	Ccnb2	Cenpa	Rom1	Hist1h1e	Ywhah	Cdc25b	Hist1h1d	Gm4316	Actg1
+Exh.KLR	consolidated	Gzma	Klre1	Ccl5	Klra9	Zeb2	S1pr5	Emb	Klrc1	Ltb	Ccl4	Ccl3	Cx3cr1	Ly6e	Nkg7	Fasl	Gzmb	Rap1b	Rack1	Eef1a1	Emp3	Klf2	Klrk1	Il18rap	Ahnak	Tbx21	Klf3	Ifitm10	Klra3	Ccnd3	Itgb2	Ctsd	Borcs7
+Exh.Term	consolidated	Cd7	Rgs1	Ccl4	Nr4a2	Sh2d2a	Cd160	Cxcr6	AW112010	Lag3	Serpina3g	Cd3g	Tox	Nkg7	Osgin1	Adgrg1	Ier5l	Cd244	Cd38	Chn2	2900026A02Rik	Gzma	Fos	Dusp1	Trgv2	Trbv4	Ptger4	Jun	Gzmk	Abi3	Lax1	Ccl5
+Proliferation	consolidated	Stmn1	Pclaf	Hmgb2	Dut	Birc5	Tuba1b	Anxa2	H2afz	Lgals1	Lgals3	Mki67	Ccnb2	Mcm3	Mcm5	Vim	Cenpa	Ran	Rrm2	Cks1b	Gapdh	Ube2c	H2afx	Tubb4b	Top2a	Hist1h2ap	Tubb5	Hist1h1b	Ccna2	Cdca8	Hist1h2ae	Cdk1	Nusap1	Lmnb1
+Exh.HSP	consolidated	Hspa1b	Ccl5	Hspa1a	Nkg7	Rgs16	Tox	Lgals3	Satb1	Ifi27l2a	Lag3	S100a4	Rack1	Ubc	H2-Q7	Ccl3	Gm42418	Tcf7	Prr5l	Emb	H2-K1

@@ -1,0 +1,11 @@
+# commands run sequentially inside of charliew_fionaac_sc
+cp /net/bmc-pub15/data/bmc/public/Spranger/220721Spr/10x-merged/D22-8689/outs/filtered_feature_bc_matrix/* .
+mv barcodes.tsv.gz CPAK_d12_barcodes.tsv.gz
+mv features.tsv.gz CPAK_d12_features.tsv.gz
+mv matrix.mtx.gz CPAK_d12_matrix.mtx.gz
+
+cp /net/bmc-pub15/data/bmc/public/Spranger/220721Spr/10x-merged/D22-8689/outs/filtered_feature_bc_matrix/* .
+mv barcodes.tsv.gz CPAK_d18_barcodes.tsv.gz
+mv features.tsv.gz CPAK_d18_features.tsv.gz
+mv matrix.mtx.gz CPAK_d18_matrix.mtx.gz
+

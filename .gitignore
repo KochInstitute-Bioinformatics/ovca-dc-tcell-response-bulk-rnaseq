@@ -1,0 +1,108 @@
+# ---------------------------------------------------------------------------
+# Strategy: track code, launchers, samplesheets, gene sets, small metadata and
+# key figures. Ignore raw data, pipeline output and anything regenerable.
+# ---------------------------------------------------------------------------
+
+# Nextflow
+work/
+.nextflow*
+slurm*.out
+slurm*.err
+
+# Raw sequencing data and alignments
+*.fastq.gz
+*.fq.gz
+*.bam
+*.bai
+*.bigWig
+*.bed
+*.gtf
+*.fa
+*.fasta
+
+# nf-core/rnaseq output directories (regenerate with nf-core_rnaseq_*.sh)
+salmon/
+star_salmon/
+pipeline_info/
+bigwig/
+rseqc/
+dupradar/
+featurecounts/
+deseq2_qc/
+samtools_stats/
+aux_info/
+libParams/
+logs/
+log/
+multiqc/
+MULTIQC/
+trimgalore/
+fq_lint/
+fastqc/
+FASTQC/
+FASTQSCREEN/
+
+# nf-core/rnaseq per-sample tables
+*.inner_distance.txt
+*_lengths.tsv
+*_counts.tsv
+*_scaled.tsv
+
+# GSEA: keep inputs at the top of each gsea* dir (.gmt/.gmx/.rnk/.sh/.xlsx);
+# ignore the per-run output folders (date-named, e.g. aug04/, aug25/)
+**/gsea*/*/
+
+# GEO submission: keep the small metadata files (xlsx, md5s, authors),
+# ignore the staged data directories and pipeline-derived expression tables
+**/geo_submission/*/
+**/WI_fionaac/geo_submission/
+**/fionaac_082526/geo_submission/
+
+# Large project-specific files (regenerate or obtain separately)
+mm10_ens113_*.xlsx
+*_assembled.xlsx
+
+# R
+R/
+renv/library/
+.Rproj.user/
+.Rhistory
+*.Rhistory
+.RData
+*.RData
+*.rds
+*_cache/
+*.nb.html
+
+# Rendered Rmd output (re-knit from the .Rmd)
+*_files/
+*_processing.html
+
+# Python / conda
+.conda/
+__pycache__/
+*.pyc
+*.pyo
+
+# User-level dirs sometimes created by containers / tools
+.claude/
+.cache/
+.local/
+.config/
+
+# OS / editor / Office temp files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*.code-workspace
+~$*
+.~lock.*
+*.tmp
+*.temp
+*.log
+
+# Unpublished manuscript drafts
+**/DC_OvCa_manuscript*.docx

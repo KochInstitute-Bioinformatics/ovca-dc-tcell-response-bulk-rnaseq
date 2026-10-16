@@ -1,0 +1,985 @@
+---
+title: "fionaac_082526 - R processing of Fiona Chatterjee intratumor Tcell RNAseq Experiment"
+author: "Charlie Whittaker"
+date: "8/25/2026"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 4
+  html_notebook: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(tidy=FALSE, cache=TRUE,
+                      dev="png", message=FALSE, error=FALSE, warning=TRUE)
+```
+
+
+## Load libraries
+
+```{r, warning=FALSE,error=FALSE,message=FALSE}
+library(openxlsx)
+library(tidyverse)
+library(reprex)
+library(matrixStats)
+library(XML)
+library(ggrepel)
+library(rtracklayer)
+library(DESeq2)
+library(apeglm)
+library(ComplexHeatmap)
+library(tximport)
+library(edgeR)
+library(gprofiler2)
+library(cluster)
+library(stringr)
+library(fgsea)
+library(showtext)
+library(GseaVis)
+```
+
+# load IGB libraries
+
+Loading Custom code
+
+data_formatting_tools.R: functions for organizing, combining, and writing data tables
+analysis_tools.R: functions for running differential expression and PCA
+plots.R: functions for generating figures
+
+setting the scipen option as such makes R display numbers instead of shortening to scientific notation ("0.01" instead of "1e-02")
+
+```{r}
+source('../../../Rcode/data_formatting_tools.R')
+source('../../../Rcode/analysis_tools.R')
+source('../../../Rcode/plots.R')
+source('../../../Rcode/common.R')
+source('../../../Rcode/ssGSEA.Library.R')
+
+options(scipen = 9)
+```
+
+# Prepare Annotation - gencode primary assembly basic annotation
+
+```{r}
+# z <- import("../../../annotationFiles/Mus_musculus.GRCm39.113.gtf")
+# tx2gene <- as.data.frame(z) %>% select(c('transcript_id','gene_id'))
+# tx2gene <- unique(tx2gene)
+# tx2gene <- tx2gene %>% filter(!is.na(transcript_id))
+# 
+# gene2typesym <- as.data.frame(z) %>% select(c('gene_id','gene_biotype','gene_name'))
+# gene2typesym <- unique(gene2typesym)
+# 
+# write.xlsx(tx2gene,colNames=TRUE, quote=FALSE, rowNames=FALSE, file="../../../annotationFiles/mm10_ens113_tx2gene.xlsx")
+# write.xlsx(gene2typesym,colNames=TRUE, quote=FALSE, rowNames=FALSE, file="../../../annotationFiles/mm10_ens113_gene2typesym.xlsx")
+```
+
+## Import previously saved annotation files
+
+In subsequent runs, necessary annotations can be loaded in this way from saved files
+
+```{r}
+tx2gene <- read.xlsx("../../../annotationFiles/mm10_ens113_tx2gene.xlsx")
+gene2typesym <- read.xlsx("../../../annotationFiles/mm10_ens113_gene2typesym.xlsx")
+```
+
+# Import data from star_salmon
+
+## Import the samples file
+
+```{r import-samples-file}
+dir <- getwd()
+list.files(dir)
+
+samples <- read.xlsx("fiona_082526_samples.xlsx")
+samples
+```
+
+## Import the data
+
+```{r import-tximport-data}
+files <- file.path(dir,samples$Folder, "quant.sf")
+files
+
+names(files) <- paste0(samples$Sample)
+all(file.exists(files))
+
+txi <- tximport(files, type = "salmon", tx2gene = tx2gene)
+names(txi)
+
+intCt <- round((txi$counts),0)
+colnames(intCt)<-paste0(colnames(intCt),".intCt")
+
+l2tpm <- log((txi$abundance+1),2)
+colnames(l2tpm)<-paste0(colnames(l2tpm),".l2tpm")
+dumpDat <- merge(intCt, l2tpm, by=0, all=TRUE)
+```
+
+## Boxplot of all log2 tpm data to check quality
+
+This plot includes all transcripts/genes in the annotation target.
+
+```{r boxplot-all-l2tpm, fig.width=10,fig.height=6}
+dim(l2tpm)
+
+ggplot(stack(as.data.frame(l2tpm)), aes(x = ind, y = values)) + geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + ggtitle("l2tpm boxplot") 
+```
+
+# Annotation of gene expression data and post-processing
+
+Once quantified, the gene level salmon data needs to be associated with additional information to facilitate interpretation
+
+## Annotate assembled data
+
+Note: The annotation file may contain a few examples of multiple gene/type annotations associated with the same EnsID.
+This can duplicate rows in dumpData during merge, check dimensions of objects.
+
+```{r annotate-assembled-data}
+assembleDat <- merge(x=dumpDat,y=gene2typesym, by.x=c("Row.names"), by.y=c("gene_id"), all.x=TRUE, all.y = FALSE)
+
+assembleDat <- mutate(assembleDat, Avg = rowMeans(select(assembleDat, ends_with(".l2tpm")), na.rm = TRUE))
+assembleDat <- mutate(assembleDat, Var = rowVars(as.matrix(select(assembleDat, ends_with(".l2tpm")), na.rm = TRUE)))
+assembleDat <- assembleDat %>% mutate(LowExpLowVar = ifelse(Avg <= 0.1 & Var <= 0.1,"Yes","No"))
+```
+
+## Adding MPG column
+
+Often multiple geneids will map to the same gene symbol. In these cases, it is helpful to select a representative geneID for each group of gene symbols. The code block below iterates through each unique gene symbol, compares all of the geneids associated with the same gene symbol and identifies the geneid with the highest average expression. This gene is then set as the representative (max-per-gene) geneid for that symbol. Note: If multiple geneids have the same highest avg expression, the first gene that appears in the dataframe is taken
+
+The code below performs the following steps:
+  1) Create a vector called "mpg" of "No" values the same length as the number of rows in the dataframe assembleData
+  2) Loop over the assembleDat object ... identifying index values of duplicate genes, updating mpg vector
+  3) Merge mpg vector to assemblDat object with setting column name as "MPG"
+
+
+```{r add-mpg-column}
+mpg <- rep('No', nrow(assembleDat))
+
+for (i in unique(assembleDat[,"gene_name"])){
+    if (is.na(i)){next}
+    idxs <- which(assembleDat[,"gene_name"] == i)
+    max_idx <- which(assembleDat$Avg[idxs] == max(assembleDat$Avg[idxs]))[1]
+    
+    mpg[idxs[max_idx]] <- 'Yes'
+}
+
+assembleDat$MPG <- mpg
+```
+
+## Additional boxplots after data filtering
+
+This plot uses the annotation and expression level calculations to select only expressed protein coding genes
+
+```{r boxplot-filtered-l2tpm, fig.width=10,fig.height=6}
+l2tpm.select <- assembleDat %>% filter(MPG == "Yes" &
+                                   gene_biotype == "protein_coding" &
+                                   LowExpLowVar == "No") %>% select(ends_with(".l2tpm"))
+
+
+dim(l2tpm.select)
+
+ggplot(stack(as.data.frame(l2tpm.select)), aes(x = ind, y = values)) + geom_boxplot() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + ggtitle("l2tpm Expressed Protein coding boxplot") 
+```
+
+# Differential Expression Testing
+
+## Create dds object from tximport data setting one of the conditions as reference
+
+```{r create-dds-object}
+# Factor Condition with Control explicitly set as the reference (first) level
+samples$Condition <- factor(samples$Condition, levels = c("Control", "Flt3L", "IL12_MSA"))
+
+# Factor Replicate
+samples$Replicate <- factor(samples$Replicate, levels = c(1, 2, 3))
+
+dds <- DESeqDataSetFromTximport(txi = txi,
+                                     colData=samples,
+                                     design = ~ Condition
+                                     )
+
+dds$Condition <- relevel(dds$Condition, "Control")
+```
+
+## Prepare an exploratory PCA plot
+
+By default, plotPCA using the 500 most variable genes for PCA 1 vs PCA 2 plots
+this can be adjusted with ntop argument
+
+```{r pca-plot-exploratory}
+vsd <- vst(dds, blind=FALSE)
+
+plotPCA(vsd, intgroup="Condition", ntop=500) + geom_point(size = 4) + ggtitle("Condition")
+plotPCA(vsd, intgroup="Replicate", ntop=500) + geom_point(size = 4) + ggtitle("Replicate")
+plotPCA(vsd, intgroup="ReadCount", ntop=500) + geom_point(size = 4) + ggtitle("ReadCount")
+plotPCA(vsd, intgroup="MapRate", ntop=500) + geom_point(size = 4) + ggtitle("MapRate")
+
+
+pcaData <- plotPCA(vsd, intgroup="Condition", returnData=TRUE, ntop=500)
+pcaData
+#write.xlsx(pcaData, colNames=TRUE, rowNames=TRUE, overwrite = TRUE, file="pca.xlsx")
+```
+
+### Prepare PCA plot using the input data instead of the built-in function
+
+```{r pca-plot-custom, fig.height=6,fig.width=6}
+percentVar <- round(100 * attr(pcaData, "percentVar"))
+x_label <- paste0("PC1 (", percentVar[1], "% variation)")
+y_label <- paste0("PC2 (", percentVar[2], "% variation)")
+
+# Modify the columns to include the delta symbol
+pcaData$name <- gsub("IL12_MSA_1", "IL12-MSA_1", pcaData$name)
+pcaData$name <- gsub("IL12_MSA_2", "IL12-MSA_2", pcaData$name)
+pcaData$name <- gsub("IL12_MSA_3", "IL12-MSA_3", pcaData$name)
+
+# Create the PCA plot
+p <- ggplot(pcaData, aes(x = PC1, y = PC2)) +
+  geom_point(aes(color = Condition), size = 4) +
+  geom_label_repel(aes(label = name),
+                   force          = 3,          # ⬇ reduced from 25 — less aggressive repulsion
+                   point.padding  = 0.5,          # ⬇ reduced from 3  — segment now touches the point
+                   box.padding    = 0.4,        # ⬇ reduced from 1.5 — labels sit closer overall
+                   min.segment.length = 0,
+                   max.overlaps   = 100,
+                   seed           = 42,
+                   segment.color  = "grey50",
+                   segment.size   = 0.6,
+                   label.padding  = unit(0.25, "lines"),
+                   label.size     = 0.4) +
+  scale_color_manual(values = c("Control" = "grey10", "Flt3L" = "pink", "IL12_MSA" = "darkred")) +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        plot.title = element_text(hjust = 0.5)) +
+  labs(title = "Intratumor T-Cells PCA",
+       x = x_label,
+       y = y_label,
+       color = "Condition")
+
+showtext_auto()
+
+# Save and display the plot
+print(p)
+ggsave("pcaFig_Intratumor.pdf", plot = p, device = "pdf", width = 6, height = 6, dpi = 300)
+```
+
+## Run tests vs Control
+
+```{r run-deseq-vs-control}
+dds <- DESeq(dds)
+resultsNames(dds)
+```
+
+### vs Control comparisons coef
+
+```{r vs-control-comparisons-coef}
+vs_Control.comparisons <- resultsNames(dds)[c(2,3)]
+vs_Control.comparisons
+```
+
+### Prepare results and join to data table
+
+```{r vs-control-results-join}
+for (i in vs_Control.comparisons){
+  res <- as.data.frame(lfcShrink(dds, coef=i, type="apeglm"))
+  compar_name <- i
+  cleanCompar <- str_replace(compar_name, "Condition_", "")
+  stat_col <- paste('WaldStatistic', compar_name, sep = '_')
+  stat <- dds@rowRanges@elementMetadata[,stat_col]
+  res$stat <- stat
+
+  res <- res %>% select(c("log2FoldChange", "pvalue", "padj","stat"))
+  res <- res %>% mutate(absFC = abs(log2FoldChange))
+  res <- res %>% dplyr::mutate(negLogP = -log10(padj))
+  
+  colnames(res) <- paste(cleanCompar, colnames(res), sep = '.')
+  res <- tibble::rownames_to_column(res, "RowName")
+  assembleDat <- merge(x=assembleDat,y=res, by.x=c("Row.names"),by.y=c("RowName"), all=TRUE)
+}
+```
+
+## Relevel to Flt3L and rerun tests
+
+```{r relevel-flt3l-rerun}
+dds$Condition <- relevel(dds$Condition, "Flt3L")
+
+dds <- DESeq(dds)
+resultsNames(dds)
+```
+
+### vs Control comparisons coef
+
+```{r vs-flt3l-comparisons-coef}
+vs_Flt3L.comparisons <- resultsNames(dds)[c(3)]
+vs_Flt3L.comparisons
+```
+
+### Prepare results and join to data table
+
+```{r vs-flt3l-results-join}
+for (i in vs_Flt3L.comparisons){
+  res <- as.data.frame(lfcShrink(dds, coef=i, type="apeglm"))
+  compar_name <- i
+  cleanCompar <- str_replace(compar_name, "Condition_", "")
+  stat_col <- paste('WaldStatistic', compar_name, sep = '_')
+  stat <- dds@rowRanges@elementMetadata[,stat_col]
+  res$stat <- stat
+
+  res <- res %>% select(c("log2FoldChange", "pvalue", "padj","stat"))
+  res <- res %>% mutate(absFC = abs(log2FoldChange))
+  res <- res %>% dplyr::mutate(negLogP = -log10(padj))
+  
+  colnames(res) <- paste(cleanCompar, colnames(res), sep = '.')
+  res <- tibble::rownames_to_column(res, "RowName")
+  assembleDat <- merge(x=assembleDat,y=res, by.x=c("Row.names"),by.y=c("RowName"), all=TRUE)
+}
+```
+
+### Write output files for supplemental material and geo submission
+
+#### Supplemental data file
+
+```{r write-supplemental-xlsx}
+write.xlsx(assembleDat,colNames=TRUE, quote=FALSE, rowNames=FALSE, file="Intratumor_Tcells_assembled.xlsx")
+```
+
+#### GEO files
+
+```{r write-geo-files}
+# Create submission directory if it does not exist
+system("mkdir -p ../geo_submission && chmod 775 ../geo_submission")
+
+IntCt.geo <- assembleDat %>% dplyr::select(Row.names,ends_with(".intCt"))
+IntCt.geo <- IntCt.geo %>% dplyr::rename(ENSID = Row.names)
+IntCt.geo <- IntCt.geo %>% dplyr::rename_all(~str_replace(., "\\.intCt", ""))
+write.table(IntCt.geo,file="../geo_submission/Intratumor_Tcells_counts.txt", sep = "\t", quote = FALSE, row.names = FALSE)
+
+l2tpm.geo <- assembleDat %>% dplyr::select(Row.names,ends_with(".l2tpm"))
+l2tpm.geo <- l2tpm.geo %>% dplyr::rename(ENSID = Row.names)
+l2tpm.geo <- l2tpm.geo %>% dplyr::rename_all(~str_replace(., "\\.l2tpm", ""))
+write.table(l2tpm.geo,file="../geo_submission/Intratumor_Tcells_l2tpm.txt", sep = "\t", quote = FALSE, row.names = FALSE)
+```
+
+# Volcano plots
+
+## Prepare gene expression data for plotting
+
+```{r prepare-volcano-data}
+vol_df <- assembleDat %>% dplyr::filter(MPG == "Yes" & 
+                                    gene_biotype == "protein_coding" & 
+                                    LowExpLowVar == "No") %>% dplyr::select(gene_name,ends_with(".log2FoldChange"),ends_with(".padj"))
+```
+
+## Adjust the data table for better plotting
+
+### Replaces NA value padj columns with 1 and NA value log2FoldChange with 0 and sets y axis according to max(abs(LFC))
+
+create a copy of the differential expression data prior to processing
+
+```{r replace-na-values}
+vol_df.edit <- vol_df
+
+vol_df.edit <- vol_df.edit <- vol_df.edit %>% dplyr::mutate_at(vars(ends_with(".padj")), ~ ifelse(is.na(.), 1, .))
+vol_df.edit <- vol_df.edit <- vol_df.edit %>% dplyr::mutate_at(vars(ends_with(".log2FoldChange")), ~ ifelse(is.na(.), 0, .))
+```
+
+### Check adjusted results with the summary function
+
+```{r summary-adjusted-data}
+summary(vol_df.edit)
+```
+
+### joins list of annotated genes for coloring
+
+Genes of interest can come from various different places.
+
+```{r join-genes-of-interest}
+#vol_df.edit <- merge(vol_df.edit,OfInterest,by.x="gene",by.y="Gene", all.x=TRUE, all.y = FALSE)
+#vol_df.edit <- vol_df.edit %>% arrange(!is.na(Pathway),Pathway)
+```
+
+### applies a ceiling to -log10(adp)
+
+This may not be necessary but can help when there are a handful of genes with large -log10(adp)
+
+```{r cap-log10-padj}
+vol_df.edit <- vol_df.edit <- vol_df.edit %>% dplyr::mutate_at(vars(ends_with(".padj")), ~ ifelse(. < 1e-20, 1e-20, .))
+```
+
+### sets y axis according to max(abs(LFC))
+
+```{r max-fc-for-yaxis}
+maxFCs <- vol_df.edit %>% summarize(across(ends_with(".log2FoldChange"), ~ max(abs(.), na.rm = TRUE)))
+maxFCs
+max(maxFCs)
+```
+
+### Prepare vector of plot comparisons
+
+```{r prepare-comparisons-vector}
+comparisons_to_plot <- colnames(vol_df.edit)
+comparisons_to_plot <- grep("log2FoldChange$", comparisons_to_plot, value = TRUE)
+comparisons_to_plot <- sub("\\.log2FoldChange$", "", comparisons_to_plot)
+comparisons_to_plot
+```
+
+### Plotting the Comparisons
+
+```{r plot-volcano-comparisons, fig.width=8,fig.height=6}
+for (i in comparisons_to_plot) {
+  # Highlight DEGs
+  col_log2FoldChange <- paste0(i, ".log2FoldChange")
+  col_padj <- paste0(i, ".padj")
+  
+  vol_df.edit <- vol_df.edit %>% 
+    mutate(toLabel = if_else(abs(vol_df.edit[[col_log2FoldChange]]) >= 3 & -log10(vol_df.edit[[col_padj]]) >= 7, gene_name, NA_character_))
+  
+  # Identify the maximum fold change for each comparison
+  maxFC <- round(max(abs(vol_df.edit[[col_log2FoldChange]])), 0)
+  
+  # Identify the maximum -log10 p-value for each comparison
+  maxP <- round(max(-log10(vol_df.edit[[col_padj]])), 0)
+
+  sorted_df <- vol_df.edit %>% arrange(vol_df.edit$toLabel)
+
+  # Separate data frames for points and labels
+  points_df <- sorted_df %>% filter(is.na(toLabel))
+  labels_df <- sorted_df %>% filter(!is.na(toLabel))
+
+  # Create the volcano plot
+  plot_title <- paste("Volcano Plot for DEGS", i)
+  p <- ggplot() +
+    geom_point(data = points_df, aes(x = -log10(.data[[col_padj]]), y = .data[[col_log2FoldChange]], color = "grey70"), size = 2) +
+    geom_point(data = labels_df, aes(x = -log10(.data[[col_padj]]), y = .data[[col_log2FoldChange]], color = "red"), size = 3) +
+    geom_label_repel(data = labels_df, aes(x = -log10(.data[[col_padj]]), y = .data[[col_log2FoldChange]], label = toLabel), box.padding = 0.5, size = 3, max.overlaps = 50) +
+    scale_color_manual(values = c("grey70", "red")) +
+    theme_bw() +
+    geom_hline(yintercept = 0, color = "blue") +
+    theme(
+      panel.border = element_blank(),
+      panel.grid.major = element_blank(),
+      panel.grid.minor = element_blank(),
+      axis.line = element_line(colour = "black"),
+      legend.position = "none"
+    ) +
+    scale_y_continuous(breaks = seq(-maxFC, maxFC, 1), limits = c(-maxFC-0.5, maxFC+0.5)) +
+    scale_x_continuous(limits = c(0, maxP+1)) +
+    ggtitle(plot_title)
+
+  print(p)
+}
+
+ggsave("DEG_volcano_IntratumorT.pdf", plot = p, device = "pdf", width = 8, height = 6, dpi = 300)
+```
+
+### Fold change plot
+
+```{r fold-change-comparison-plot, fig.width=8,fig.height=5}
+ggplot(vol_df.edit, aes(x = IL12_MSA_vs_Control.log2FoldChange, 
+                        y = IL12_MSA_vs_Flt3L.log2FoldChange)) +
+  
+  # Points, coloured by significance in both comparisons
+  geom_point(aes(colour = case_when(
+    IL12_MSA_vs_Control.padj < 0.05 & IL12_MSA_vs_Flt3L.padj < 0.05 ~ "Sig. in both",
+    IL12_MSA_vs_Control.padj < 0.05                                  ~ "Sig. in IL12_MSA vs Control",
+    IL12_MSA_vs_Flt3L.padj   < 0.05                                  ~ "Sig. in IL12_MSA vs Flt3L",
+    TRUE                                                              ~ "Non-Sig."
+  )), alpha = 0.7, size = 2) +
+  
+  # Reference lines at 0
+  geom_hline(yintercept = 0, linetype = "dashed", colour = "grey50") +
+  geom_vline(xintercept = 0, linetype = "dashed", colour = "grey50") +
+  
+  # Diagonal line (x = y) for reference
+  geom_abline(slope = 1, intercept = 0, linetype = "dotted", colour = "grey30") +
+  
+  # Labels for genes where toLabel == TRUE
+  geom_text_repel(
+    data = subset(vol_df.edit, toLabel == TRUE),
+    aes(label = gene_name),
+    size = 3,
+    max.overlaps = 20,
+    box.padding = 0.4
+  ) +
+  
+  # Colour scale
+  scale_colour_manual(
+    name = "Significance (padj < 0.05)",
+    values = c(
+      "Sig. in both"                       = "#E63946",
+      "Sig. in IL12_MSA vs Control"   = "#457B9D",
+      "Sig. in IL12_MSA vs Flt3L"     = "#2A9D8F",
+      "Non-Sig."                    = "grey70"
+    )
+  ) +
+  
+  # Labels
+  labs(
+    title    = "IL12_MSA vs Control  ~  IL12_MSA vs Flt3L",
+    subtitle = "log2 Fold Change comparison",
+    x        = "IL12_MSA vs Control  (log2FC)",
+    y        = "IL12_MSA vs Flt3L  (log2FC)"
+  ) +
+  
+  theme_classic(base_size = 13) +
+  theme(
+    legend.position  = "right",
+    legend.title     = element_text(face = "bold"),
+    plot.title       = element_text(face = "bold"),
+    plot.subtitle    = element_text(colour = "grey40")
+  )
+```
+
+# GSEA - Functional Class Sorting
+
+## Preparing rank files for GSEA
+
+Extract protein coding genes from assembled data files, adjust the data and write rnk file in gsea directory
+this code chunk prepares rnk files for Linux GSEA runs
+
+```{r prepare-gsea-rnk-files}
+system("mkdir -p ../gsea && chmod 775 ../gsea")
+
+rnkFile <- assembleDat %>% dplyr::filter(MPG == "Yes" & gene_biotype == "protein_coding") %>% dplyr::select('gene_name',ends_with(".stat"))
+
+names <- colnames(rnkFile)
+
+for (i in names[-1]){
+  d <- rnkFile %>%  dplyr::select('gene_name',all_of(i))
+  names(d)[1] <- '#Gene'
+  d <- d[complete.cases(d), ]
+  write.table(d, sep='\t',file=paste0("../gsea/",i,".rnk"),col.names=TRUE, quote=FALSE, row.names=FALSE)
+}
+```
+
+
+## GSEA enrichment plots
+
+```{r gsea-install-packages}
+# devtools::install_github("junjunlab/GseaVis")
+# install.packages("enrichit")
+# install.packages("yulab.utils")
+```
+
+```{r gsea-load-libraries}
+library(GseaVis)
+library(enrichit)
+library(yulab.utils)
+```
+
+### Proliferation GSEA
+
+```{r proliferation-gsea-plot, fig.width=7,fig.height=5}
+gene <- c("Top2a","Mki67")
+prolif.plot <- gseaNb(object = NULL,
+       filePath = "../gsea/aug25/Flt3L_vs_Control.stat.rnk.GilesDaniel.GseaPreranked.1787661576656/",
+       geneSetID = "PROLIFERATION",
+       subPlot = 2,
+       rmHt = T,
+       legend.position = c(0.8,0.8),
+       termWidth = 50,
+       addGene = gene,
+       addPval = T,
+       pvalX = 0.8,pvalY = 0.8)
+
+prolif.plot
+ 
+ggsave("gsea_PROLIFERATION.pdf", plot = prolif.plot, device = "pdf", width = 7, height = 5, dpi = 300)
+```
+### Effector GSEA
+
+```{r effector-gsea-plot, fig.width=7,fig.height=5}
+gene <- c("Klrg1","Itgax")
+effect.plot <- gseaNb(object = NULL,
+       filePath = "../gsea/aug25/IL12_MSA_vs_Control.stat.rnk.GilesDaniel.GseaPreranked.1787661588881/",
+       geneSetID = "EFFECTOR",
+       subPlot = 2,
+       rmHt = T,
+       legend.position = c(0.8,0.8),
+       termWidth = 50,
+       addGene = gene,
+       addPval = T,
+       pvalX = 0.8,pvalY = 0.8)
+
+effect.plot
+ 
+ggsave("gsea_EFFECTOR.pdf", plot = effect.plot, device = "pdf", width = 7, height = 5, dpi = 300)
+```
+
+# PCA analysis of revision samples with original IP
+
+```{r import-ip-data}
+ip <- read.xlsx("WI_fionaac_IP_assembled.xlsx")
+```
+
+## Combine current experiment counts with IP data
+
+The intratumor T-cell samples processed above (`assembleDat`) and the previously processed IP dataset (`ip`) were quantified against the same mm10 Ensembl annotation, so counts can be combined directly on Ensembl gene ID (`Row.names`). Each dataset is first restricted to representative, expressed, protein-coding genes (`MPG == "Yes"`, `gene_biotype == "protein_coding"`, `LowExpLowVar == "No"`), the same filter used for the boxplots and volcano plots above, before merging.
+
+Note: as above, ambiguous annotation rows can duplicate a Row.names value; `distinct()` guards against that when merging.
+
+```{r combine-current-and-ip-counts}
+current_ct <- assembleDat %>%
+  dplyr::filter(MPG == "Yes" & gene_biotype == "protein_coding" & LowExpLowVar == "No") %>%
+  dplyr::select(Row.names, ends_with(".intCt")) %>%
+  dplyr::distinct(Row.names, .keep_all = TRUE)
+
+ip_ct <- ip %>%
+  dplyr::filter(MPG == "Yes" & gene_biotype == "protein_coding" & LowExpLowVar == "No") %>%
+  dplyr::select(Row.names, ends_with(".intCt")) %>%
+  dplyr::distinct(Row.names, .keep_all = TRUE)
+
+combined_ct <- merge(current_ct, ip_ct, by = "Row.names")
+dim(combined_ct)
+```
+
+## Build combined count matrix and sample metadata
+
+```{r build-combined-matrix-metadata}
+combinedCt <- combined_ct %>% dplyr::select(-Row.names)
+rownames(combinedCt) <- combined_ct$Row.names
+colnames(combinedCt) <- str_replace(colnames(combinedCt), "\\.intCt$", "")
+combinedCt <- as.matrix(combinedCt)
+
+current_samples <- samples$Sample
+
+combined_samples <- data.frame(Sample = colnames(combinedCt), row.names = colnames(combinedCt))
+
+combined_samples <- combined_samples %>%
+  mutate(Dataset = ifelse(Sample %in% current_samples, "IntratumorT", "IP"),
+         # IP samples have no loaded metadata file, so Condition is inferred from
+         # the sample naming convention (trailing "_<replicate number>" stripped)
+         Condition = ifelse(Sample %in% current_samples,
+                             as.character(samples$Condition[match(Sample, samples$Sample)]),
+                             str_replace(Sample, "_[0-9]+$", "")))
+
+combined_samples$Dataset <- factor(combined_samples$Dataset, levels = c("IntratumorT", "IP"))
+combined_samples$Condition <- factor(combined_samples$Condition)
+combined_samples
+```
+
+## Create combined DESeq2 object and exploratory PCA
+
+The two datasets come from separate experiments with no shared design, so `blind=TRUE` is used for the variance stabilizing transform so that Dataset/batch does not bias gene selection.
+
+```{r combined-dds-pca}
+dds.combined <- DESeqDataSetFromMatrix(countData = combinedCt,
+                                        colData = combined_samples,
+                                        design = ~ 1)
+
+vsd.combined <- vst(dds.combined, blind = TRUE)
+
+plotPCA(vsd.combined, intgroup = "Dataset", ntop = 5000) + geom_point(size = 4) + ggtitle("Dataset")
+plotPCA(vsd.combined, intgroup = "Condition", ntop = 5000) + geom_point(size = 4) + ggtitle("Condition")
+
+pcaData.combined <- plotPCA(vsd.combined, intgroup = c("Dataset", "Condition"), returnData = TRUE, ntop = 5000)
+pcaData.combined
+```
+
+### Prepare combined PCA plot using the input data instead of the built-in function
+
+```{r combined-pca-custom-plot, fig.height=7,fig.width=8}
+percentVar.combined <- round(100 * attr(pcaData.combined, "percentVar"))
+x_label <- paste0("PC1 (", percentVar.combined[1], "% variation)")
+y_label <- paste0("PC2 (", percentVar.combined[2], "% variation)")
+
+# Modify the columns to include the delta symbol
+pcaData.combined$name <- gsub("Delta3_IP_1", "\u03941+2+3_1", pcaData.combined$name)
+pcaData.combined$name <- gsub("Delta3_IP_2", "\u03941+2+3_2", pcaData.combined$name)
+pcaData.combined$name <- gsub("WT_IP_1", "WT_1", pcaData.combined$name)
+pcaData.combined$name <- gsub("WT_IP_2", "WT_2", pcaData.combined$name)
+pcaData.combined$name <- gsub("WT_IP_3", "WT_3", pcaData.combined$name)
+pcaData.combined$name <- gsub("IL12_MSA_1", "IL12-MSA_1", pcaData.combined$name)
+pcaData.combined$name <- gsub("IL12_MSA_2", "IL12-MSA_2", pcaData.combined$name)
+pcaData.combined$name <- gsub("IL12_MSA_3", "IL12-MSA_3", pcaData.combined$name)
+
+p.combined <- ggplot(pcaData.combined, aes(x = PC1, y = PC2)) +
+  geom_point(aes(color = Condition, shape = Dataset), size = 5) +
+  geom_label_repel(aes(label = name),
+                   force          = 5,
+                   point.padding  = 0.4,
+                   box.padding    = 0.4,
+                   min.segment.length = 0,
+                   max.overlaps   = 100,
+                   seed           = 42,
+                   segment.color  = "grey50",
+                   segment.size   = 0.9,
+                   label.padding  = unit(0.25, "lines"),
+                   label.size     = 0.4) +
+  scale_color_manual(values = c("Control" = "grey10", "Flt3L" = "pink", "IL12_MSA" = "darkred",
+                                 "WT_IP" = "grey40", "Delta3_IP" = "purple")) +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        plot.title = element_text(hjust = 0.5)) +
+  labs(title = "Intratumor T-Cells + IP Combined PCA",
+       x = x_label,
+       y = y_label,
+       color = "Condition",
+       shape = "Dataset")
+
+print(p.combined)
+ggsave("pcaFig_Intratumor_plus_IP.pdf", plot = p.combined, device = "pdf", width = 8, height = 7, dpi = 300)
+```
+
+### Extract PCA loadings for PC1 and PC2
+
+`plotPCA()` only returns per-sample PC scores, not the per-gene contributions (loadings) to each component. To see which genes are driving separation along PC1 and PC2, the PCA is re-run here on the same top 500 most-variable genes DESeq2 uses internally (`rowVars(assay(vsd.combined))`, top `ntop`), which recovers the underlying `prcomp` object and its `rotation` matrix (the loadings).
+
+```{r extract-pca-loadings}
+ntop <- 5000
+rv.combined <- rowVars(assay(vsd.combined))
+topVarGenes <- order(rv.combined, decreasing = TRUE)[seq_len(min(ntop, length(rv.combined)))]
+
+pca.combined <- prcomp(t(assay(vsd.combined)[topVarGenes, ]))
+
+loadings.combined <- as.data.frame(pca.combined$rotation[, c("PC1", "PC2")])
+loadings.combined <- tibble::rownames_to_column(loadings.combined, "Row.names")
+
+loadings.combined <- merge(loadings.combined, gene2typesym[, c("gene_id", "gene_name")],
+                            by.x = "Row.names", by.y = "gene_id", all.x = TRUE)
+loadings.combined <- loadings.combined %>%
+  dplyr::filter(!is.na(gene_name) & gene_name != "") %>%
+  dplyr::distinct(gene_name, .keep_all = TRUE)
+
+write.xlsx(loadings.combined, colNames = TRUE, rowNames = FALSE,
+           file = "combinedPCA_PC1_PC2_loadings.xlsx")
+```
+
+### Pathway enrichment on PC1 and PC2 loadings
+
+Genes among the top 500 variable genes are ranked by their PC1 (then PC2) loading, most positive to most negative, and tested with `fgsea` against the same T-cell state gene sets (`Giles_Daniel_Combined.gmt`) used for the differential expression GSEA above. This reuses the DE preranked-GSEA approach, but ranks on loading instead of Wald statistic.
+
+```{r pca-loadings-fgsea}
+pathways.giles <- fgsea::gmtPathways("../gsea/Giles_Daniel_Combined.gmt")
+
+runLoadingFgsea <- function(pc){
+  rnk <- setNames(loadings.combined[[pc]], loadings.combined$gene_name)
+  rnk <- sort(rnk, decreasing = TRUE)
+  res <- fgsea::fgsea(pathways = pathways.giles, stats = rnk, eps = 0)
+  res <- res %>% dplyr::arrange(padj)
+  res$leadingEdge <- sapply(res$leadingEdge, paste, collapse = ",")
+  res
+}
+
+pc1.loading.fgsea <- runLoadingFgsea("PC1")
+pc2.loading.fgsea <- runLoadingFgsea("PC2")
+
+pc1.loading.fgsea
+pc2.loading.fgsea
+
+write.xlsx(as.data.frame(pc1.loading.fgsea), colNames = TRUE, rowNames = FALSE,
+           file = "combinedPCA_PC1_pathway_fgsea.xlsx")
+write.xlsx(as.data.frame(pc2.loading.fgsea), colNames = TRUE, rowNames = FALSE,
+           file = "combinedPCA_PC2_pathway_fgsea.xlsx")
+```
+
+### Plot significant pathways in Giles by principal component
+
+```{r plot-pca-pathway-nes, fig.width=8,fig.height=5}
+plotLoadingNES <- function(res, pcName){
+  sig <- res %>% dplyr::filter(padj < 0.05)
+  if (nrow(sig) == 0) {
+    message("No pathways significant at padj < 0.05 for ", pcName)
+    return(invisible(NULL))
+  }
+  ggplot(sig, aes(x = reorder(pathway, NES), y = NES, fill = NES > 0)) +
+    geom_col() +
+    coord_flip() +
+    scale_fill_manual(values = c("TRUE" = "firebrick", "FALSE" = "steelblue"), guide = "none") +
+    theme_minimal() +
+    theme(axis.text = element_text(size = 13),
+          axis.title = element_text(size = 14),
+          plot.title = element_text(size = 15, face = "bold")) +
+    labs(title = paste(pcName, "loadings: pathway enrichment"),
+         x = NULL, y = "Normalized Enrichment Score (NES)")
+}
+
+plotLoadingNES(pc1.loading.fgsea, "PC1")
+plotLoadingNES(pc2.loading.fgsea, "PC2")
+```
+
+### Pathway enrichment on PC1 and PC2 loadings using MSigDB Canonical Pathways
+
+The Giles/Daniel sets above are a small, curated panel of T-cell states. For a broader view, the MSigDB C2 "Canonical Pathways" collection (KEGG, Reactome, WikiPathways, BioCarta, PID) is pulled in for mouse via `msigdbr` and tested the same way.
+
+Note: the loadings are only defined for the top 500 most-variable genes used in the PCA above, not the whole transcriptome, so overlap with any given canonical pathway is often small and power here is lower than a whole-transcriptome preranked test (like the DE GSEA earlier in this document). Treat this as a coarse look at which broad pathway themes are already represented among the genes known to be driving PC1/PC2, not a fully powered enrichment test.
+
+```{r msigdb-install-packages}
+# install.packages("msigdbr")
+# first use may prompt installation of the 'msigdbdf' data package, which requires one-time internet access to download
+```
+
+```{r msigdb-load-canonical-pathways}
+library(msigdbr)
+
+msigdb_cp <- msigdbr(species = "Mus musculus", category = "C2") %>%
+  dplyr::filter(grepl("^CP($|:)", gs_subcat))
+
+pathways.msigdb.cp <- split(msigdb_cp$gene_symbol, msigdb_cp$gs_name)
+length(pathways.msigdb.cp)
+```
+
+```{r pca-loadings-msigdb-fgsea}
+runLoadingFgseaMsigdb <- function(pc){
+  rnk <- setNames(loadings.combined[[pc]], loadings.combined$gene_name)
+  rnk <- sort(rnk, decreasing = TRUE)
+  res <- fgsea::fgsea(pathways = pathways.msigdb.cp, stats = rnk, eps = 0, minSize = 5)
+  res <- res %>% dplyr::arrange(padj)
+  res$leadingEdge <- sapply(res$leadingEdge, paste, collapse = ",")
+  res
+}
+
+pc1.loading.msigdb <- runLoadingFgseaMsigdb("PC1")
+pc2.loading.msigdb <- runLoadingFgseaMsigdb("PC2")
+
+head(pc1.loading.msigdb, 15)
+head(pc2.loading.msigdb, 15)
+
+write.xlsx(as.data.frame(pc1.loading.msigdb), colNames = TRUE, rowNames = FALSE,
+           file = "combinedPCA_PC1_pathway_msigdbCP_fgsea.xlsx")
+write.xlsx(as.data.frame(pc2.loading.msigdb), colNames = TRUE, rowNames = FALSE,
+           file = "combinedPCA_PC2_pathway_msigdbCP_fgsea.xlsx")
+```
+
+### Plot top MSigDB Canonical Pathways by principal component
+
+```{r plot-pca-msigdb-nes, fig.width=11,fig.height=6}
+plotTopMsigdbNES <- function(res, pcName, topN = 20){
+  sig <- res %>% dplyr::filter(padj < 0.05) %>% dplyr::slice_min(padj, n = topN)
+  if (nrow(sig) == 0) {
+    message("No MSigDB CP pathways significant at padj < 0.05 for ", pcName)
+    return(invisible(NULL))
+  }
+  sig$label <- gsub("_", " ", sub("^[A-Z]+_", "", sig$pathway))
+  ggplot(sig, aes(x = reorder(label, NES), y = NES, fill = NES > 0)) +
+    geom_col() +
+    coord_flip() +
+    scale_fill_manual(values = c("TRUE" = "firebrick", "FALSE" = "steelblue"), guide = "none") +
+    theme_minimal() +
+    theme(axis.text = element_text(size = 13),
+          axis.title = element_text(size = 14),
+          plot.title = element_text(size = 15, face = "bold")) +
+    labs(title = paste(pcName, "loadings: top MSigDB Canonical Pathways"),
+         x = NULL, y = "Normalized Enrichment Score (NES)")
+}
+
+plotTopMsigdbNES(pc1.loading.msigdb, "PC1")
+plotTopMsigdbNES(pc2.loading.msigdb, "PC2")
+```
+
+# Differential expression: IL12-MSA vs Delta1+2+3
+
+IL12-MSA (IntratumorT dataset) and Delta1+2+3 (IP dataset) are the two groups PC2 separates from each other (see the combined PCA above). This runs a standard DESeq2 comparison directly between them, with Delta1+2+3 set as the reference level, following the same `lfcShrink`/Wald-statistic pattern used for the vs-Control and vs-Flt3L comparisons earlier.
+
+## Subset combined data and build DESeq2 object
+
+```{r il12-vs-delta123-dds}
+combined_samples.il12.delta3 <- combined_samples %>%
+  dplyr::filter(Condition %in% c("IL12_MSA", "Delta3_IP"))
+
+combinedCt.il12.delta3 <- combinedCt[, rownames(combined_samples.il12.delta3)]
+
+# Factor Condition with Delta1+2+3 (Delta3_IP) explicitly set as the reference level
+combined_samples.il12.delta3$Condition <- factor(combined_samples.il12.delta3$Condition,
+                                                   levels = c("Delta3_IP", "IL12_MSA"))
+
+il12.vs.delta3.dds <- DESeqDataSetFromMatrix(countData = combinedCt.il12.delta3,
+                                              colData = combined_samples.il12.delta3,
+                                              design = ~ Condition)
+
+il12.vs.delta3.dds <- DESeq(il12.vs.delta3.dds)
+resultsNames(il12.vs.delta3.dds)
+```
+
+## Run DESeq2 and extract results
+
+```{r il12-vs-delta123-results}
+il12.vs.delta3.coef <- resultsNames(il12.vs.delta3.dds)[2]
+il12.vs.delta3.coef
+
+il12.vs.delta3.res <- as.data.frame(lfcShrink(il12.vs.delta3.dds, coef = il12.vs.delta3.coef, type = "apeglm"))
+
+stat_col <- paste('WaldStatistic', il12.vs.delta3.coef, sep = '_')
+il12.vs.delta3.res$stat <- il12.vs.delta3.dds@rowRanges@elementMetadata[, stat_col]
+
+il12.vs.delta3.res <- il12.vs.delta3.res %>% select(c("log2FoldChange", "pvalue", "padj", "stat"))
+il12.vs.delta3.res <- il12.vs.delta3.res %>% mutate(absFC = abs(log2FoldChange))
+il12.vs.delta3.res <- il12.vs.delta3.res %>% dplyr::mutate(negLogP = -log10(padj))
+
+il12.vs.delta3.res <- tibble::rownames_to_column(il12.vs.delta3.res, "Row.names")
+il12.vs.delta3.res <- merge(il12.vs.delta3.res, gene2typesym[, c("gene_id", "gene_name")],
+                             by.x = "Row.names", by.y = "gene_id", all.x = TRUE)
+il12.vs.delta3.res <- il12.vs.delta3.res %>% dplyr::distinct(Row.names, .keep_all = TRUE)
+
+write.xlsx(il12.vs.delta3.res, colNames = TRUE, rowNames = FALSE,
+           file = "IL12MSA_vs_Delta123_DE.xlsx")
+```
+
+## Volcano plot highlighting top PC2 loading genes
+
+The top 10 genes with the most positive PC2 loadings (pulling samples toward IL12-MSA) are highlighted in red; the top 10 most negative PC2 loadings (pulling samples toward Delta1+2+3) are highlighted in blue. All other genes are plotted in grey, following the volcano plot style used above.
+
+```{r il12-vs-delta123-volcano-pc2, fig.width=8,fig.height=6}
+top10.pc2.pos <- loadings.combined %>% dplyr::arrange(dplyr::desc(PC2)) %>% dplyr::slice_head(n = 10) %>% dplyr::pull(Row.names)
+top10.pc2.neg <- loadings.combined %>% dplyr::arrange(PC2) %>% dplyr::slice_head(n = 10) %>% dplyr::pull(Row.names)
+
+volc.il12.delta3 <- il12.vs.delta3.res %>%
+  dplyr::mutate(padj = ifelse(is.na(padj), 1, padj),
+                log2FoldChange = ifelse(is.na(log2FoldChange), 0, log2FoldChange),
+                padj = ifelse(padj < 1e-20, 1e-20, padj)) %>%
+  dplyr::mutate(pc2Group = dplyr::case_when(
+    Row.names %in% top10.pc2.pos ~ "Top 10 PC2+",
+    Row.names %in% top10.pc2.neg ~ "Top 10 PC2-",
+    TRUE ~ "Other"
+  ),
+  pointColor = dplyr::case_when(
+    pc2Group == "Top 10 PC2+" ~ "red",
+    pc2Group == "Top 10 PC2-" ~ "blue",
+    TRUE ~ "grey70"
+  ),
+  toLabel = ifelse(pc2Group != "Other", gene_name, NA_character_))
+
+points_df <- volc.il12.delta3 %>% dplyr::filter(pc2Group == "Other")
+labels_df <- volc.il12.delta3 %>% dplyr::filter(pc2Group != "Other")
+
+maxFC <- round(max(abs(volc.il12.delta3$log2FoldChange)), 0)
+maxP <- round(max(-log10(volc.il12.delta3$padj)), 0)
+
+p.il12.delta3.volcano <- ggplot() +
+  geom_point(data = points_df, aes(x = -log10(padj), y = log2FoldChange, color = pointColor), size = 2) +
+  geom_point(data = labels_df, aes(x = -log10(padj), y = log2FoldChange, color = pointColor), size = 3) +
+  geom_label_repel(data = labels_df, aes(x = -log10(padj), y = log2FoldChange, label = toLabel, color = pointColor),
+                    box.padding = 0.5, size = 5, fontface = "bold", max.overlaps = 50, show.legend = FALSE) +
+  scale_color_manual(values = c("grey70" = "grey70", "red" = "red", "blue" = "blue"),
+                      breaks = c("red", "blue"),
+                      labels = c("Top 10 PC2+ loadings", "Top 10 PC2- loadings"),
+                      name = NULL) +
+  theme_bw() +
+  geom_hline(yintercept = 0, color = "black", linetype = "dashed") +
+  theme(
+    panel.border = element_blank(),
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.line = element_line(colour = "black"),
+    legend.position = "bottom",
+    axis.text = element_text(size = 13),
+    axis.title = element_text(size = 14),
+    legend.text = element_text(size = 12),
+    plot.title = element_text(size = 15, face = "bold")
+  ) +
+  scale_y_continuous(breaks = seq(-maxFC, maxFC, 1), limits = c(-maxFC-0.5, maxFC+0.5)) +
+  scale_x_continuous(limits = c(0, maxP+1)) +
+  ggtitle("Volcano Plot for DEGs IL12_MSA_vs_Delta3_IP (PC2 loading genes highlighted)")
+
+print(p.il12.delta3.volcano)
+ggsave("DEG_volcano_IL12MSA_vs_Delta123_PC2highlight.pdf", plot = p.il12.delta3.volcano,
+       device = "pdf", width = 8, height = 6, dpi = 300)
+```
+
+# write session info
+
+Capturing information about the R session helps document your work
+
+```{r write-session-info}
+sessionInfo()
+writeLines(capture.output(sessionInfo()), "Intratumor_Tcell_sessionInfo.txt")
+```

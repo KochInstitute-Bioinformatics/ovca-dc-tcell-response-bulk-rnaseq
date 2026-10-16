@@ -1,0 +1,73 @@
+R version 4.6.1 (2026-06-24)
+Platform: x86_64-pc-linux-gnu
+Running under: Ubuntu 24.04.4 LTS
+
+Matrix products: default
+BLAS:   /usr/lib/x86_64-linux-gnu/openblas-pthread/libblas.so.3 
+LAPACK: /usr/lib/x86_64-linux-gnu/openblas-pthread/libopenblasp-r0.3.26.so;  LAPACK version 3.12.0
+
+locale:
+ [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C               LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8    
+ [5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8    LC_PAPER=en_US.UTF-8       LC_NAME=C                 
+ [9] LC_ADDRESS=C               LC_TELEPHONE=C             LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C       
+
+time zone: Etc/UTC
+tzcode source: system (glibc)
+
+attached base packages:
+[1] grid      stats4    stats     graphics  grDevices utils     datasets  methods   base     
+
+other attached packages:
+ [1] gplots_3.3.0                readxl_1.5.0                yulab.utils_0.2.5           enrichit_0.2.6             
+ [5] GseaVis_0.1.1               fgsea_1.38.0                msigdbr_26.1.1              cluster_2.1.8.2            
+ [9] gprofiler2_0.2.4            edgeR_4.10.6                limma_3.68.5                tximport_1.40.0            
+[13] circlize_0.4.18             ComplexHeatmap_2.28.0       apeglm_1.34.0               DESeq2_1.52.0              
+[17] SummarizedExperiment_1.42.0 Biobase_2.72.0              MatrixGenerics_1.24.0       rtracklayer_1.72.0         
+[21] GenomicRanges_1.64.0        Seqinfo_1.2.0               IRanges_2.46.0              S4Vectors_0.50.3           
+[25] BiocGenerics_0.58.1         generics_0.1.4              ggrepel_0.9.8               XML_3.99-0.25              
+[29] matrixStats_1.5.0           reprex_2.1.1                lubridate_1.9.5             forcats_1.0.1              
+[33] stringr_1.6.0               dplyr_1.2.1                 purrr_1.2.2                 readr_2.2.0                
+[37] tidyr_1.3.2                 tibble_3.3.1                ggplot2_4.0.3               tidyverse_2.0.0            
+[41] openxlsx_4.2.9             
+
+loaded via a namespace (and not attached):
+  [1] fs_2.1.0                 bitops_1.1-0             enrichplot_1.32.1        httr_1.4.9              
+  [5] RColorBrewer_1.1-3       doParallel_1.0.17        numDeriv_2016.8-1.1      tools_4.6.1             
+  [9] R6_2.6.1                 lazyeval_0.2.3           GetoptLong_1.1.1         withr_3.0.3             
+ [13] cli_3.6.6                textshaping_1.0.5        scatterpie_0.2.6         labeling_0.4.3          
+ [17] mvtnorm_1.4-2            S7_0.2.2                 ggridges_0.5.7           Rsamtools_2.28.0        
+ [21] systemfonts_1.3.2        gson_0.2.2               DOSE_4.6.0               spacesXYZ_1.6-0         
+ [25] bbmle_1.0.26             rstudioapi_0.19.0        RSQLite_3.53.3           gridGraphics_0.5-1      
+ [29] shape_1.4.6.1            BiocIO_1.22.0            gtools_3.9.5             crosstalk_1.2.2         
+ [33] vroom_1.7.1              zip_3.0.2                GO.db_3.23.1             Matrix_1.7-5            
+ [37] logger_0.4.3             abind_1.4-8              lifecycle_1.0.5          yaml_2.3.12             
+ [41] qvalue_2.44.0            SparseArray_1.12.3       blob_1.3.0               promises_1.5.0          
+ [45] crayon_1.5.3             bdsmatrix_1.3-7          ggtangle_0.1.4           lattice_0.22-9          
+ [49] cowplot_1.2.0            cigarillo_1.2.1          KEGGREST_1.52.2          magick_2.9.1            
+ [53] pillar_1.11.1            knitr_1.52               rjson_0.2.23             codetools_0.2-20        
+ [57] fastmatch_1.1-8          glue_1.8.1               ggiraph_0.9.6            ggfun_0.2.2             
+ [61] fontLiberation_0.1.0     data.table_1.18.6.1      vctrs_0.7.3              png_0.1-9               
+ [65] treeio_1.36.1            cellranger_1.1.0         gtable_0.3.6             assertthat_0.2.1        
+ [69] ggpp_0.6.1               emdbook_1.3.14           cachem_1.1.0             xfun_0.60               
+ [73] S4Arrays_1.12.1          mime_0.13                cols4all_0.10            coda_0.19-4.1           
+ [77] rsconnect_1.11.0         aisdk_1.4.12             iterators_1.0.14         statmod_1.5.2           
+ [81] nlme_3.1-169             ggtree_4.2.0             bit64_4.8.6              fontquiver_0.2.1        
+ [85] KernSmooth_2.23-26       otel_0.2.0               colorspace_2.1-4         DBI_1.3.0               
+ [89] tidyselect_1.2.1         processx_3.9.0           bit_4.6.0                compiler_4.6.1          
+ [93] curl_8.0.0               httr2_1.3.0              fontBitstreamVera_0.1.1  DelayedArray_0.38.2     
+ [97] plotly_4.12.1            scales_1.4.0             caTools_1.18.4           callr_3.8.0             
+[101] rappdirs_0.3.4           digest_0.6.39            ggsankey_0.0.99999       rmarkdown_2.32          
+[105] XVector_0.52.0           htmltools_0.5.9          pkgconfig_2.0.3          fastmap_1.2.0           
+[109] rlang_1.3.0              GlobalOptions_0.1.4      htmlwidgets_1.6.4        shiny_1.14.0            
+[113] farver_2.1.2             jsonlite_2.0.0           BiocParallel_1.46.0      GOSemSim_2.38.3         
+[117] RCurl_1.98-1.20          magrittr_2.0.5           polynom_1.4-1            ggplotify_0.1.4         
+[121] patchwork_1.3.2          Rcpp_1.1.2               ape_5.8-1                babelgene_22.9          
+[125] ggnewscale_0.5.2         gdtools_0.5.2            stringi_1.8.9            MASS_7.3-65             
+[129] plyr_1.8.9               parallel_4.6.1           splines_4.6.1            Biostrings_2.80.2       
+[133] hms_1.1.4                locfit_1.5-9.12          ps_1.9.3                 igraph_2.3.3            
+[137] reshape2_1.4.5           evaluate_1.0.5           tweenr_2.0.3             tzdb_0.5.0              
+[141] foreach_1.5.2            httpuv_1.6.17            polyclip_1.10-7          clue_0.3-68             
+[145] ggforce_0.5.0            xtable_1.8-8             restfulr_0.0.17          tidytree_0.4.8          
+[149] tidydr_0.0.7             later_1.4.8              viridisLite_0.4.3        ragg_1.5.2              
+[153] clusterProfiler_4.20.2   aplot_0.3.2              memoise_2.0.1            AnnotationDbi_1.74.0    
+[157] GenomicAlignments_1.48.0 timechange_0.4.0        
