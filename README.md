@@ -5,18 +5,15 @@ study (Spranger lab; sequencing done at the Whitehead Institute Genome Technolog
 Samples were sequenced in two batches about a year apart and analysed separately
 (preprocessing) and together (differential expression, PCA, GSEA).
 
-> **Status:** work in progress. The primary contrast (IL12-MSA vs delta123) is
-> confounded with sequencing batch; see [Known issues](#known-issues).
-
 ## Experimental design
 
-| Condition   | n | Batch | Notes                                      |
-| ----------- | - | ----- | ------------------------------------------ |
-| WT (WT_IP)  | 3 | 1     | role (baseline vs active wild-type) to confirm |
-| delta123    | 2 | 1     | labelled `Delta3_IP` in some files         |
-| Control     | 3 | 2     | Control_3 is a possible outlier            |
-| Flt3L      | 3 | 2     |                                            |
-| IL12-MSA    | 3 | 2     | high within-group variance                 |
+| Condition  | n | Batch | Notes                                         |
+| ---------- | - | ----- | --------------------------------------------- |
+| WT (WT_IP) | 3 | 1     | role: baseline vs active wild-type; confirm    |
+| delta123   | 2 | 1     | labelled `Delta3_IP` in some files            |
+| Control    | 3 | 2     | Control_3 is a possible outlier               |
+| Flt3L      | 3 | 2     |                                               |
+| IL12-MSA   | 3 | 2     | high within-group variance                    |
 
 Batch 1 also includes lymph node / tumor samples (`LN_1-3`, `Tumor_1-3`; 11 samples
 in total) processed in the `WI_fionaac` run. The 14 samples in the table above are
@@ -90,15 +87,6 @@ per-batch `tximport_mm/*_sessionInfo.txt`.
 
 Raw and processed data are deposited at GEO (accession: _TBD_). Submission
 metadata is in the `geo_submission/` folders.
-
-## Known issues
-
-- IL12-MSA (batch 2) and delta123 (batch 1) share no batch, so `~ batch + condition`
-  is not full rank. Resolving this depends on whether WT_IP is an untreated
-  baseline or active wild-type IL-12. Details in `combined/opus_summary.md`.
-- Whether "IP" denotes administration route or the anatomical source of the T cells must be confirmed.
-- Transcript-to-gene tables are named `mm10_ens113_*` but are built from the GRCm39 (mm39)
-  Ensembl 113 GTF; the file names are a misnomer.
 
 ## Contact
 
