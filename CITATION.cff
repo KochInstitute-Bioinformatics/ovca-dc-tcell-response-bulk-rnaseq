@@ -1,0 +1,65 @@
+cff-version: 1.2.0
+message: "If you use this code or analysis, please cite it as below."
+type: software
+title: "Immune regulatory type 2 conventional dendritic cells restrain tumor-specific T cell responses in ovarian cancer"
+authors:
+  - family-names: Chatterjee
+    given-names: Fiona
+    affiliation: "Koch Institute for Integrative Cancer Research at MIT, Cambridge, MA, USA; Department of Biology, MIT, Cambridge, MA, USA"
+  - family-names: Wolczanski
+    given-names: Grace
+    affiliation: "Koch Institute for Integrative Cancer Research at MIT, Cambridge, MA, USA; Department of Biology, MIT, Cambridge, MA, USA"
+  - family-names: Whittaker
+    given-names: Charles A.
+    affiliation: "Koch Institute for Integrative Cancer Research at MIT, Cambridge, MA, USA"
+  - family-names: Huang
+    given-names: Amy Y.
+    affiliation: "Ragon Institute of Mass General Brigham, MIT, and Harvard, Cambridge, MA, USA; Computational and System Biology Program, MIT, Cambridge, MA, USA"
+  - family-names: Wu
+    given-names: Jing Ze
+    affiliation: "Ragon Institute of Mass General Brigham, MIT, and Harvard, Cambridge, MA, USA"
+  - family-names: Butty
+    given-names: Vincent L.
+    affiliation: "Koch Institute for Integrative Cancer Research at MIT, Cambridge, MA, USA"
+  - family-names: Rosendahl
+    given-names: Nikita
+    affiliation: "Mater Research Institute, The University of Queensland, Translational Research Institute, Woolloongabba, QLD, Australia"
+  - family-names: Duhamel
+    given-names: Lauren
+    affiliation: "Koch Institute for Integrative Cancer Research at MIT, Cambridge, MA, USA; Department of Biological Engineering, MIT, Cambridge, MA, USA"
+  - family-names: Bhandarkar
+    given-names: Teresa
+    affiliation: "Koch Institute for Integrative Cancer Research at MIT, Cambridge, MA, USA; Department of Biology, MIT, Cambridge, MA, USA"
+  - family-names: Wisdom
+    given-names: Amy J.
+    affiliation: "Koch Institute for Integrative Cancer Research at MIT, Cambridge, MA, USA; Department of Biology, MIT, Cambridge, MA, USA; Department of Radiation Oncology, Mass General Brigham, Harvard Medical School, Boston, MA, USA"
+  - family-names: Tuong
+    given-names: Zewen Kelvin
+    affiliation: "Mater Research Institute, The University of Queensland, Translational Research Institute, Woolloongabba, QLD, Australia"
+  - family-names: Sharma
+    given-names: Naveen
+    affiliation: "Department of Immunology, The University of Texas MD Anderson Cancer Center, Houston, TX, USA"
+  - family-names: Allison
+    given-names: James P.
+    affiliation: "Department of Immunology, The University of Texas MD Anderson Cancer Center, Houston, TX, USA; James P. Allison Institute, The University of Texas MD Anderson Cancer Center, Houston, TX, USA; Parker Institute for Cancer Immunotherapy, The University of Texas MD Anderson Cancer Center, TX, USA"
+  - family-names: Wittrup
+    given-names: K. Dane
+    affiliation: "Koch Institute for Integrative Cancer Research at MIT, Cambridge, MA, USA; Department of Biological Engineering, MIT, Cambridge, MA, USA; Department of Chemical Engineering, MIT, Cambridge, MA, USA"
+  - family-names: Radford
+    given-names: Kristen J.
+    affiliation: "Mater Research Institute, The University of Queensland, Translational Research Institute, Woolloongabba, QLD, Australia"
+  - family-names: Wong
+    given-names: Harikesh S.
+    affiliation: "Department of Biology, MIT, Cambridge, MA, USA; Ragon Institute of Mass General Brigham, MIT, and Harvard, Cambridge, MA, USA"
+  - family-names: Spranger
+    given-names: Stefani
+    affiliation: "Koch Institute for Integrative Cancer Research at MIT, Cambridge, MA, USA; Department of Biology, MIT, Cambridge, MA, USA; Ragon Institute of Mass General Brigham, MIT, and Harvard, Cambridge, MA, USA"
+repository-code: "https://github.com/KochInstitute-Bioinformatics/ovca-dc-tcell-response-bulk-rnaseq"
+abstract: "Bulk RNA-seq analysis code for the study of T cell responses to type 2 conventional dendritic cell regulation in ovarian cancer."
+license: MIT
+keywords:
+  - bulk RNA-seq
+  - ovarian cancer
+  - dendritic cells
+  - T cells
+  - DESeq2
