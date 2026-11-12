@@ -3,10 +3,10 @@ title: "WI_fionaac - R processing of Fiona Chatterjee IP Bulk RNAseq Experiment"
 author: "Charlie Whittaker"
 date: "7/24/2025"
 output: 
-  html_notebook: default
   html_document:
     toc: true
     toc_depth: 4
+  html_notebook: default
 ---
 
 ```{r setup, include=FALSE}

@@ -9,7 +9,7 @@ Samples were sequenced in two batches about a year apart and analysed separately
 
 | Condition  | n | Batch | Notes                                         |
 | ---------- | - | ----- | --------------------------------------------- |
-| WT (WT_IP) | 3 | 1     | role: baseline vs active wild-type; confirm    |
+| WT (WT_IP) | 3 | 1     | role: baseline vs active wild-type; confirm   |
 | delta123   | 2 | 1     | labelled `Delta3_IP` in some files            |
 | Control    | 3 | 2     | Control_3 is a possible outlier               |
 | Flt3L      | 3 | 2     |                                               |
