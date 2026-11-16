@@ -46,7 +46,6 @@ combined/         Cross-batch analysis
   analysis/*.Rmd             combined_processing, intratumorT_processing, WI_fionaac_IP_processing
   analysis/                  result tables (xlsx, txt) and figures (PDF)
   analysis/gsea/             GSEA inputs and scripts (run folders not tracked)
-  opus_summary.md            design notes and open questions
 Rcode/            ssGSEA / GenePattern scripts from the Broad Institute (own license),
                   sourced by the Rmds as 'Rcode/...' (see Workflow, step 2)
 annotationFiles/  tx2gene / gene2typesym tables (tracked); Ensembl 113 GRCm39 GTF (not tracked)
