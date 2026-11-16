@@ -67,7 +67,7 @@ see `.gitignore`. Unpublished manuscript drafts are also excluded.
    ```
 
    Edit the genome and index paths in the scripts for your environment.
-2. **Import and normalise** (R, tximport + DESeq2): the `.Rmd` files in
+2. **Import and normalize** (R, tximport + DESeq2): the `.Rmd` files in
    `combined/analysis/` (cross-batch) and in each batch's `tximport_mm/`.
    The Rmds read `mm10_ens113_tx2gene.xlsx` and `mm10_ens113_gene2typesym.xlsx`
    from their working directory; the code that builds them from the Ensembl 113
@@ -84,7 +84,7 @@ per-batch `tximport_mm/*_sessionInfo.txt`.
 
 ## Data availability
 
-Raw and processed data are deposited at GEO (accession: _TBD_). Submission
+Raw and processed data are deposited at GEO (accession: GSE316613). Submission
 metadata is in the `geo_submission/` folders.
 
 ## Contact
